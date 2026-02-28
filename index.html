@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Serpent Rose</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a0a1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+      color: #ff9fcc;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      letter-spacing: 4px;
+      margin-bottom: 8px;
+      text-shadow: 0 0 20px #ff69b4, 0 0 40px #ff1493;
+    }
+
+    #score-board {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 16px;
+      font-size: 1rem;
+      letter-spacing: 2px;
+    }
+
+    #score-board span { color: #fff; font-weight: bold; }
+
+    #canvas-wrapper {
+      position: relative;
+      border: 3px solid #ff69b4;
+      border-radius: 8px;
+      box-shadow: 0 0 30px #ff1493, 0 0 60px #ff69b433;
+    }
+
+    canvas { display: block; border-radius: 6px; }
+
+    #overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(26, 10, 26, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      gap: 12px;
+    }
+
+    #overlay h2 {
+      font-size: 2rem;
+      text-shadow: 0 0 16px #ff1493;
+    }
+
+    #overlay p { font-size: 1rem; color: #ffb3d9; }
+
+    button {
+      margin-top: 8px;
+      padding: 12px 36px;
+      font-size: 1.1rem;
+      background: linear-gradient(135deg, #ff69b4, #ff1493);
+      color: #fff;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      letter-spacing: 2px;
+      box-shadow: 0 0 16px #ff1493;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 28px #ff1493;
+    }
+
+    #controls {
+      margin-top: 14px;
+      font-size: 0.8rem;
+      color: #ff69b488;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🐍 SERPENT ROSE</h1>
+
+<div id="score-board">
+  <div>SCORE : <span id="score">0</span></div>
+  <div>MEILLEUR : <span id="best">0</span></div>
+</div>
+
+<div id="canvas-wrapper">
+  <canvas id="canvas" width="400" height="400"></canvas>
+  <div id="overlay">
+    <h2>SERPENT ROSE</h2>
+    <p>Mange les pommes, évite les murs !</p>
+    <button id="btn">JOUER</button>
+  </div>
+</div>
+
+<div id="controls">↑ ↓ ← → ou ZQSD pour diriger</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('best');
+const btn = document.getElementById('btn');
+
+const COLS = 20, ROWS = 20;
+const CELL = canvas.width / COLS;
+
+let snake, dir, nextDir, food, score, best = 0, loop;
+
+// Pink gradient for the snake head
+const HEAD_GRAD = (() => {
+  const g = ctx.createRadialGradient(0, 0, 1, 0, 0, CELL / 2);
+  g.addColorStop(0, '#ff9fcc');
+  g.addColorStop(1, '#ff1493');
+  return g;
+})();
+
+function rand(max) { return Math.floor(Math.random() * max); }
+
+function placeFood() {
+  let pos;
+  do {
+    pos = { x: rand(COLS), y: rand(ROWS) };
+  } while (snake.some(s => s.x === pos.x && s.y === pos.y));
+  food = pos;
+}
+
+function startGame() {
+  snake = [
+    { x: 10, y: 10 },
+    { x: 9,  y: 10 },
+    { x: 8,  y: 10 },
+  ];
+  dir = { x: 1, y: 0 };
+  nextDir = { x: 1, y: 0 };
+  score = 0;
+  scoreEl.textContent = 0;
+  placeFood();
+  overlay.style.display = 'none';
+  clearInterval(loop);
+  loop = setInterval(tick, 120);
+}
+
+function tick() {
+  dir = nextDir;
+
+  const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+  // Wall collision
+  if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
+    return endGame();
+  }
+  // Self collision
+  if (snake.some(s => s.x === head.x && s.y === head.y)) {
+    return endGame();
+  }
+
+  snake.unshift(head);
+
+  if (head.x === food.x && head.y === food.y) {
+    score++;
+    scoreEl.textContent = score;
+    if (score > best) { best = score; bestEl.textContent = best; }
+    placeFood();
+  } else {
+    snake.pop();
+  }
+
+  draw();
+}
+
+function drawCell(x, y, style, radius = 3) {
+  const px = x * CELL, py = y * CELL;
+  ctx.fillStyle = style;
+  ctx.beginPath();
+  ctx.roundRect(px + 1, py + 1, CELL - 2, CELL - 2, radius);
+  ctx.fill();
+}
+
+function draw() {
+  // Background grid
+  ctx.fillStyle = '#120812';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Subtle grid lines
+  ctx.strokeStyle = '#2a0a2a';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= COLS; i++) {
+    ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, canvas.height); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i * CELL); ctx.lineTo(canvas.width, i * CELL); ctx.stroke();
+  }
+
+  // Snake body
+  snake.forEach((seg, i) => {
+    if (i === 0) return; // head drawn separately
+    const ratio = 1 - i / snake.length;
+    const r = Math.round(255 * ratio + 160 * (1 - ratio));
+    const g = Math.round(30 * ratio);
+    const b = Math.round(140 * ratio + 60 * (1 - ratio));
+    drawCell(seg.x, seg.y, `rgb(${r},${g},${b})`, 4);
+
+    // Glow on body segments near head
+    if (i < 5) {
+      ctx.shadowColor = '#ff1493';
+      ctx.shadowBlur = 8;
+      drawCell(seg.x, seg.y, `rgba(255,20,147,${0.15 - i * 0.03})`, 4);
+      ctx.shadowBlur = 0;
+    }
+  });
+
+  // Snake head with glow
+  ctx.shadowColor = '#ff69b4';
+  ctx.shadowBlur = 18;
+  drawCell(snake[0].x, snake[0].y, '#ff69b4', 6);
+  ctx.shadowBlur = 0;
+
+  // Eyes
+  const hx = snake[0].x * CELL, hy = snake[0].y * CELL;
+  ctx.fillStyle = '#fff';
+  const eyeOffsets = dir.x !== 0
+    ? [{ ex: dir.x > 0 ? 0.7 : 0.3, ey: 0.3 }, { ex: dir.x > 0 ? 0.7 : 0.3, ey: 0.7 }]
+    : [{ ex: 0.3, ey: dir.y > 0 ? 0.7 : 0.3 }, { ex: 0.7, ey: dir.y > 0 ? 0.7 : 0.3 }];
+  eyeOffsets.forEach(({ ex, ey }) => {
+    ctx.beginPath();
+    ctx.arc(hx + ex * CELL, hy + ey * CELL, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1a0a1a';
+    ctx.beginPath();
+    ctx.arc(hx + ex * CELL + dir.x, hy + ey * CELL + dir.y, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+  });
+
+  // Food (apple with glow)
+  ctx.shadowColor = '#ff4500';
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = '#ff3b3b';
+  ctx.beginPath();
+  const fx = food.x * CELL + CELL / 2, fy = food.y * CELL + CELL / 2;
+  ctx.arc(fx, fy, CELL / 2 - 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Apple stem
+  ctx.strokeStyle = '#4a2';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(fx, fy - CELL / 2 + 4);
+  ctx.quadraticCurveTo(fx + 4, fy - CELL / 2, fx + 5, fy - CELL / 2 + 2);
+  ctx.stroke();
+
+  // Shine on apple
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(fx - 2, fy - 2, 2.5, 1.5, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function endGame() {
+  clearInterval(loop);
+  overlay.style.display = 'flex';
+  overlay.querySelector('h2').textContent = score > 0 ? `SCORE : ${score}` : 'GAME OVER';
+  overlay.querySelector('p').textContent =
+    score > 5 ? 'Excellent ! Rejoue ?' : 'Pas de chance... Rejoue !';
+  btn.textContent = 'REJOUER';
+}
+
+btn.addEventListener('click', startGame);
+
+document.addEventListener('keydown', e => {
+  const map = {
+    ArrowUp:    { x: 0, y: -1 }, z: { x: 0, y: -1 },
+    ArrowDown:  { x: 0, y:  1 }, s: { x: 0, y:  1 },
+    ArrowLeft:  { x: -1, y: 0 }, q: { x: -1, y: 0 },
+    ArrowRight: { x:  1, y: 0 }, d: { x:  1, y: 0 },
+  };
+  const key = map[e.key] || map[e.key.toLowerCase()];
+  if (!key) return;
+  // Prevent 180° reverse
+  if (key.x !== -dir.x || key.y !== -dir.y) nextDir = key;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+});
+
+// Initial draw
+ctx.fillStyle = '#120812';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+</script>
+</body>
+</html>
