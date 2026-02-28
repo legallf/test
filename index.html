@@ -88,6 +88,27 @@
       color: #ff69b488;
       letter-spacing: 1px;
     }
+
+    #dpad {
+      display: grid;
+      grid-template-areas: ". up ." "left . right" ". down .";
+      gap: 6px;
+      margin-top: 18px;
+    }
+
+    #dpad button {
+      width: 60px;
+      height: 60px;
+      font-size: 1.4rem;
+      padding: 0;
+      border-radius: 14px;
+      letter-spacing: 0;
+    }
+
+    #dpad button:nth-child(1) { grid-area: up; }
+    #dpad button:nth-child(2) { grid-area: left; }
+    #dpad button:nth-child(3) { grid-area: right; }
+    #dpad button:nth-child(4) { grid-area: down; }
   </style>
 </head>
 <body>
@@ -108,7 +129,14 @@
   </div>
 </div>
 
-<div id="controls">↑ ↓ ← → ou ZQSD pour diriger</div>
+<div id="controls">Glisse ou utilise les boutons ci-dessous</div>
+
+<div id="dpad">
+  <button id="up">▲</button>
+  <button id="left">◀</button>
+  <button id="right">▶</button>
+  <button id="down">▼</button>
+</div>
 
 <script>
 const canvas = document.getElementById('canvas');
@@ -283,6 +311,12 @@ function endGame() {
 
 btn.addEventListener('click', startGame);
 
+function applyDir(d) {
+  if (!dir) return;
+  if (d.x !== -dir.x || d.y !== -dir.y) nextDir = d;
+}
+
+// Keyboard
 document.addEventListener('keydown', e => {
   const map = {
     ArrowUp:    { x: 0, y: -1 }, z: { x: 0, y: -1 },
@@ -292,10 +326,34 @@ document.addEventListener('keydown', e => {
   };
   const key = map[e.key] || map[e.key.toLowerCase()];
   if (!key) return;
-  // Prevent 180° reverse
-  if (key.x !== -dir.x || key.y !== -dir.y) nextDir = key;
+  applyDir(key);
   if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
 });
+
+// D-pad buttons
+document.getElementById('up').addEventListener('click',    () => applyDir({ x: 0, y: -1 }));
+document.getElementById('down').addEventListener('click',  () => applyDir({ x: 0, y:  1 }));
+document.getElementById('left').addEventListener('click',  () => applyDir({ x: -1, y: 0 }));
+document.getElementById('right').addEventListener('click', () => applyDir({ x:  1, y: 0 }));
+
+// Swipe (touch)
+let touchStartX = 0, touchStartY = 0;
+canvas.addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    applyDir(dx > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 });
+  } else {
+    applyDir(dy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 });
+  }
+  e.preventDefault();
+}, { passive: false });
 
 // Initial draw
 ctx.fillStyle = '#120812';
